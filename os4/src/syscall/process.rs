@@ -1,11 +1,10 @@
 //! Process management syscalls
 
+use crate::{config::MAX_SYSCALL_NUM, task::current_task_info};
 use crate::task::{
-    current_task_info, exit_current_and_run_next, suspend_current_and_run_next,
-    translated_current_ptr, TaskStatus,
+    exit_current_and_run_next, suspend_current_and_run_next, translated_current_ptr, TaskStatus,
 };
-use crate::timer::get_time_us;
-use crate::{config::MAX_SYSCALL_NUM, mm::translated_ptr, task::current_user_token};
+use crate::{task::mmap, timer::get_time_us};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -36,7 +35,6 @@ pub fn sys_yield() -> isize {
 // YOUR JOB: 引入虚地址后重写 sys_get_time
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     let us = get_time_us();
-
     unsafe {
         *translated_current_ptr(ts) = TimeVal {
             sec: us / 1_000_000,
@@ -60,8 +58,8 @@ pub fn sys_set_priority(_prio: isize) -> isize {
 /// 1. port & 0x7 = 0 (这样的内存无意义)
 /// 1. [start, start + len) 中存在已经被映射的页
 /// 1. 物理内存不足
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    -1
+pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
+    mmap(start, len, port)
 }
 
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {

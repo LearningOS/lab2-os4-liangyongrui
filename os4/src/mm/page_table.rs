@@ -56,6 +56,7 @@ impl PageTableEntry {
 }
 
 /// page table structure
+#[derive(Debug)]
 pub struct PageTable {
     root_ppn: PhysPageNum,
     frames: Vec<FrameTracker>,
@@ -160,8 +161,12 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
 pub fn translated_ptr<T>(token: usize, ptr: *mut T) -> *mut T {
     let page_table = PageTable::from_token(token);
     let va = VirtAddr::from(ptr as usize);
-    let ppn = page_table.translate(va.floor()).unwrap().ppn();
+    let vpn = va.floor();
+    let ppn = page_table.translate(vpn).unwrap().ppn();
     let pa: PhysAddr = ppn.into();
-    (pa.0 & va.page_offset()) as _
+    let res = (pa.0 | va.page_offset()) as *mut T;
+    log::debug!(
+        "translated_ptr, token: {token}, ptr: {ptr:p}, vpn:{vpn:?}, ppn: {ppn:?} res: {res:p}"
+    );
+    res
 }
-

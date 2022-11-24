@@ -32,6 +32,7 @@ lazy_static! {
 }
 
 /// memory set structure, controls virtual-memory space
+#[derive(Debug)]
 pub struct MemorySet {
     page_table: PageTable,
     areas: Vec<MapArea>,
@@ -220,6 +221,7 @@ impl MemorySet {
 }
 
 /// map area structure, controls a contiguous piece of virtual memory
+#[derive(Debug)]
 pub struct MapArea {
     vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,

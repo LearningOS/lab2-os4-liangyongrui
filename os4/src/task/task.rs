@@ -1,10 +1,11 @@
 //! Types related to task management
 use super::TaskContext;
-use crate::config::{kernel_stack_position, MAX_SYSCALL_NUM, TRAP_CONTEXT};
+use crate::config::{kernel_stack_position, TRAP_CONTEXT, MAX_SYSCALL_NUM};
 use crate::mm::{MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::trap::{trap_handler, TrapContext};
 
 /// task control block structure
+#[derive(Debug)]
 pub struct TaskControlBlock {
     pub task_status: TaskStatus,
     pub task_cx: TaskContext,
@@ -61,6 +62,7 @@ impl TaskControlBlock {
 
 #[derive(Copy, Clone, PartialEq)]
 /// task status: UnInit, Ready, Running, Exited
+#[derive(Debug)]
 pub enum TaskStatus {
     UnInit,
     Ready,

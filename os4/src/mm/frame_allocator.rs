@@ -1,4 +1,4 @@
-//! Implementation of [`FrameAllocator`] which 
+//! Implementation of [`FrameAllocator`] which
 //! controls all the frames in the operating system.
 
 use super::{PhysAddr, PhysPageNum};
@@ -43,6 +43,7 @@ trait FrameAllocator {
 }
 
 /// an implementation for frame allocator
+#[derive(Debug)]
 pub struct StackFrameAllocator {
     current: usize,
     end: usize,
@@ -64,6 +65,7 @@ impl FrameAllocator for StackFrameAllocator {
         }
     }
     fn alloc(&mut self) -> Option<PhysPageNum> {
+        log::debug!("StackFrameAllocator: {self:?}");
         if let Some(ppn) = self.recycled.pop() {
             Some(ppn.into())
         } else if self.current == self.end {
