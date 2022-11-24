@@ -54,18 +54,34 @@ impl MemorySet {
         start_va: VirtAddr,
         end_va: VirtAddr,
         permission: MapPermission,
-    ) {
+    ) -> bool {
         self.push(
             MapArea::new(start_va, end_va, MapType::Framed, permission),
             None,
-        );
+        )
     }
-    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        map_area.map(&mut self.page_table);
+
+    pub fn unmap(&mut self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let vpn_range = VPNRange::new(start_va.floor(), end_va.ceil());
+        for vpn in vpn_range {
+            log::info!("unmap vpn_range: {:?}, vpn: {:?}", vpn_range, vpn);
+            if !self.page_table.unmap(vpn) {
+                return false;
+            }
+        }
+        // 这里的回滚没做
+        true
+    }
+    /// 成功返回true
+    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) -> bool {
+        if !map_area.map(&mut self.page_table) {
+            return false;
+        }
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data);
         }
         self.areas.push(map_area);
+        true
     }
     /// Mention that trampoline is not collected by areas.
     fn map_trampoline(&mut self) {
@@ -245,22 +261,23 @@ impl MapArea {
             map_perm,
         }
     }
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+
+    /// 失败返回false
+    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> bool {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {
                 ppn = PhysPageNum(vpn.0);
             }
             MapType::Framed => {
-                let frame = frame_alloc().unwrap();
+                let Some(frame) = frame_alloc() else { return false };
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-        page_table.map(vpn, ppn, pte_flags);
+        page_table.map(vpn, ppn, pte_flags)
     }
-    #[allow(unused)]
     pub fn unmap_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         #[allow(clippy::single_match)]
         match self.map_type {
@@ -271,17 +288,31 @@ impl MapArea {
         }
         page_table.unmap(vpn);
     }
-    pub fn map(&mut self, page_table: &mut PageTable) {
+    /// 成功返回 true
+    pub fn map(&mut self, page_table: &mut PageTable) -> bool {
+        log::info!("map vpn_range: {:?}", self.vpn_range);
+        let mut error_vpn = None;
         for vpn in self.vpn_range {
-            self.map_one(page_table, vpn);
+            if !self.map_one(page_table, vpn) {
+                error_vpn = Some(vpn);
+                log::warn!(
+                    "map vpn_range: {:?}, error_vpn: {:?}",
+                    self.vpn_range,
+                    error_vpn
+                );
+            }
         }
-    }
-    #[allow(unused)]
-    pub fn unmap(&mut self, page_table: &mut PageTable) {
-        for vpn in self.vpn_range {
-            self.unmap_one(page_table, vpn);
+        if let Some(error_vpn) = error_vpn {
+            for vpn in self.vpn_range {
+                if vpn == error_vpn {
+                    break;
+                }
+                self.unmap_one(page_table, vpn);
+            }
         }
+        error_vpn.is_none()
     }
+
     /// data: start-aligned but maybe with shorter length
     /// assume that all frames were cleared before
     pub fn copy_data(&mut self, page_table: &mut PageTable, data: &[u8]) {

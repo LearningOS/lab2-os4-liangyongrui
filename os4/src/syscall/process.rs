@@ -1,8 +1,11 @@
 //! Process management syscalls
 
-use crate::{config::MAX_SYSCALL_NUM, task::current_task_info};
 use crate::task::{
     exit_current_and_run_next, suspend_current_and_run_next, translated_current_ptr, TaskStatus,
+};
+use crate::{
+    config::MAX_SYSCALL_NUM,
+    task::{current_task_info, munmap},
 };
 use crate::{task::mmap, timer::get_time_us};
 
@@ -62,8 +65,8 @@ pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     mmap(start, len, port)
 }
 
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    munmap(start, len)
 }
 
 // YOUR JOB: 引入虚地址后重写 sys_task_info

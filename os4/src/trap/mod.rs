@@ -56,7 +56,7 @@ pub fn trap_handler() -> ! {
     let scause = scause::read();
     let stval = stval::read();
     let c = scause.cause();
-    log::info!("trap_handler, cause: {c:?}");
+    log::debug!("trap_handler, cause: {c:?}");
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
             cx.sepc += 4;

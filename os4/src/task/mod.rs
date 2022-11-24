@@ -139,7 +139,9 @@ impl TaskManager {
     /// or there is no `Ready` task and we can exit with all applications completed
     fn run_next_task(&self) {
         if let Some(next) = self.find_next_task() {
-            log::info!("ready to {next}");
+            if next > 10 {
+                log::info!("ready to {next}");
+            }
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
             let task = &mut inner.tasks[next];
@@ -186,9 +188,27 @@ impl TaskManager {
         let mut p = MapPermission::from_bits((port << 1) as u8).unwrap();
         println!("mmap MapPermission {:?}", p);
         p.set(MapPermission::U, true);
-        inner.tasks[task]
+        if !inner.tasks[task]
             .memory_set
-            .insert_framed_area(start_va, (start + len).into(), p);
+            .insert_framed_area(start_va, (start + len).into(), p)
+        {
+            return -1;
+        }
+        0
+    }
+
+    fn munmap(&self, start: usize, len: usize) -> isize {
+        let start_va: VirtAddr = start.into();
+        if start_va != start_va.floor().into() {
+            log::warn!("munmap start_vp {start:X} invail");
+            return -1;
+        }
+        let mut inner = self.inner.exclusive_access();
+        let task = inner.current_task;
+        let end_va: VirtAddr = (start + len).into();
+        if !inner.tasks[task].memory_set.unmap(start_va, end_va) {
+            return -1;
+        }
         0
     }
 }
@@ -250,4 +270,8 @@ pub fn add_syscall_times(syscall_id: usize) {
 
 pub fn mmap(start: usize, len: usize, port: usize) -> isize {
     TASK_MANAGER.mmap(start, len, port)
+}
+
+pub fn munmap(start: usize, len: usize) -> isize {
+    TASK_MANAGER.munmap(start, len)
 }

@@ -114,17 +114,29 @@ impl PageTable {
         }
         result
     }
+    /// 之前映射过返回false
     #[allow(unused)]
-    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) -> bool {
         let pte = self.find_pte_create(vpn).unwrap();
-        assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
+        if pte.is_valid() {
+            log::warn!("vpn {vpn:?} is mapped before mapping");
+            return false;
+        }
+        if vpn.0 == 0x10000 {
+            log::info!("map!!! 0x10000");
+        }
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+        true
     }
     #[allow(unused)]
-    pub fn unmap(&mut self, vpn: VirtPageNum) {
+    pub fn unmap(&mut self, vpn: VirtPageNum) -> bool {
         let pte = self.find_pte_create(vpn).unwrap();
-        assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
+        if !pte.is_valid() {
+            log::warn!("vpn {:?} is invalid before unmapping", vpn);
+            return false;
+        }
         *pte = PageTableEntry::empty();
+        true
     }
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.find_pte(vpn).copied()
